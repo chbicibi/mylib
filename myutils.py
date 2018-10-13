@@ -10,7 +10,16 @@
 2018.9.16 ver 0.7
 '''
 
-import glob, hashlib, json, os, pickle, re, subprocess, time
+import glob
+import hashlib
+import json
+import os
+import pickle
+import re
+import subprocess
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import datetime
 from functools import wraps
@@ -195,5 +204,22 @@ def load(file, default=None, update=True, from_json=False):
             return pickle.load(f)
 
 
-if __name__ == '__main__':
-    rmempty('S:/Link/Nico')
+################################################################################
+# multi thread
+################################################################################
+
+def run_mt(task, args_it, max_workers=1, Q=[]):
+    def target():
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for _ in executor.map(task, args_it):
+                if Q:
+                    break
+    try:
+        worker = threading.Thread(target=target)
+        worker.start()
+        while worker.is_alive():
+            time.sleep(1)
+    except KeyboardInterrupt as e:
+        Q.append(True)
+        worker.join()
+        raise e
