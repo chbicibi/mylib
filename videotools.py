@@ -4,7 +4,7 @@ import cv2
 import os
 from contextlib import contextmanager
 
-FFPROBE = 'ffprobe'
+FFPROBE = 'bin/ffprobe'
 LOG_DIR = 'D:/Links/Error.log'
 
 @contextmanager
