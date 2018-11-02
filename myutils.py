@@ -247,6 +247,7 @@ class CDLLHandle(object):
 
     def __exit__(self, exc_type, exc_value, traceback):
         # should be unloaded dll handle
+        pass
 
     def get_fortran_function(self, name, argtypes, restype='void', callback=lambda *x: x):
         try:
