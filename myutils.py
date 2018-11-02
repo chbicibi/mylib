@@ -10,6 +10,7 @@
 2018.9.16 ver 0.7
 '''
 
+import ctypes
 import glob
 import hashlib
 import json
@@ -223,3 +224,41 @@ def run_mt(task, args_it, max_workers=1, Q=[]):
         Q.append(True)
         worker.join()
         raise e
+
+
+################################################################################
+# cdll
+################################################################################
+
+C_TYPES = {
+'void': ctypes.c_void_p,
+'int64': ctypes.c_int64,
+'double': ctypes.c_double
+}
+
+class CDLLHandle(object):
+    def __init__(self, libname, loader_path='.'):
+        self.libname = libname
+        self.loader_path = loader_path
+        self.cdll = np.ctypeslib.load_library(libname, loader_path)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        # should be unloaded dll handle
+
+    def get_fortran_function(self, name, argtypes, restype='void', callback=lambda *x: x):
+        try:
+            f_ = getattr(self.cdll, name)
+            f_.argtypes = [ctypes.POINTER(C_TYPES[t]) for t in argtypes]
+            f_.restype = C_TYPES[restype]
+            def pyf(*args):
+                c_args = [C_TYPES[t](a) for a, t in zip(args, argtypes)]
+                c_ptrs = (ctypes.byref(a) for a in c_args)
+                res = f_(*c_ptrs)
+                return callback(*(a.value for a in c_args), res)
+            pyf.f_ptr = f_
+            return pyf
+        finally:
+            pass
