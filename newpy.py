@@ -11,6 +11,10 @@ import shutil
 
 ################################################################################
 
+def __test__():
+    pass
+
+
 def get_args():
     '''
     docstring for get_args.
@@ -29,6 +33,11 @@ def main():
     docstring for main.
     '''
     args = get_args()
+
+    if args.test:
+        __test__()
+        return
+
     file = args.out
 
     if not os.path.splitext(file)[1] == '.py':
