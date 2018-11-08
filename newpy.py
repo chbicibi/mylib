@@ -20,8 +20,10 @@ def get_args():
     docstring for get_args.
     '''
     parser = argparse.ArgumentParser()
-    parser.add_argument('--out', '-o', default='new_script',
+    parser.add_argument('out', nargs='?', default='new_script',
                         help='Filename of the new script')
+    parser.add_argument('--force', '-f', action='store_true',
+                        help='Force')
     parser.add_argument('--test', '-t', action='store_true',
                         help='Run as test mode')
     args = parser.parse_args()
@@ -43,9 +45,11 @@ def main():
     if not os.path.splitext(file)[1] == '.py':
         file = file + '.py'
 
-    if not os.path.exists(file):
-        shutil.copy(__file__, file)
-        print('create:', file)
+    if not args.force and os.path.exists(file):
+        return
+
+    shutil.copy(__file__, file)
+    print('create:', file)
 
 
 if __name__ == '__main__':
