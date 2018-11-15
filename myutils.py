@@ -89,6 +89,19 @@ def mkdir(path):
     os.makedirs(path, exist_ok=True)
 
 
+def realpath(path):
+    abspath = os.path.abspath(path)
+    if not os.path.exists(abspath):
+        raise FileNotFoundError
+    if os.path.islink(abspath):
+        return realpath(os.readlink(abspath))
+    dirname = os.path.dirname(abspath)
+    basename = os.path.basename(abspath)
+    if abspath == dirname:
+        return abspath
+    return os.path.join(realpath(dirname), basename)
+
+
 ################################################################################
 # stopwatch
 ################################################################################
