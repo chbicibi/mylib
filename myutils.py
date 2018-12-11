@@ -7,7 +7,7 @@
 2018.8.26 ver 0.4
 2018.9.02 ver 0.5
 2018.9.13 ver 0.6
-2018.9.16 ver 0.7
+2018.9.16 ver 0.7 v0.1
 '''
 
 import ctypes
@@ -150,6 +150,17 @@ def strnow(format='%Y/%m/%d %H:%M:%S'):
     return datetime.now().strftime(format)
 
 
+class StrNow(object):
+    ''' 呼び出し時の時刻を文字列で返す'''
+    def __init__(self, format='%Y%m%d_%H%M%S'):
+        self.format = format
+
+    def __str__(self):
+        return datetime.now().strftime(self.format)
+
+snow = StrNow()
+
+
 ################################################################################
 # path
 ################################################################################
@@ -276,3 +287,13 @@ class CDLLHandle(object):
             return pyf
         finally:
             pass
+
+
+################################################################################
+
+if __name__ == '__main__':
+    from time import sleep
+    for i in range(3):
+        print(snow)
+        sleep(1)
+        snow.format = snow.format[:-2]
