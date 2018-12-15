@@ -7,7 +7,8 @@
 2018.8.26 ver 0.4
 2018.9.02 ver 0.5
 2018.9.13 ver 0.6
-2018.9.16 ver 0.7
+2018.9.16 ver 0.7 v0.1
+2018.12.11 ver 0.8
 '''
 
 import ctypes
@@ -59,19 +60,26 @@ def popen(*cmds):
 
 
 def iglobm(pathname, recursive=True, sep=os.sep):
-    keys = list(product(*(s.split(',')
-                          for s in re.findall(r'{(.+?)}', pathname))))
-    pattern = re.sub(r'(?<={).+?(?=})', '', pathname)
-    if keys:
-        it = chain(*(glob.iglob(pattern.format(*k), recursive=recursive)
-                     for k in keys))
+    if isinstance(pathname, str):
+        keys = list(product(*(s.split(',')
+                              for s in re.findall(r'{(.+?)}', pathname))))
+        pattern = re.sub(r'(?<={).+?(?=})', '', pathname)
+        if keys:
+            it = chain(*(glob.iglob(pattern.format(*k), recursive=recursive)
+                         for k in keys))
+        else:
+            it = glob.iglob(pattern, recursive=recursive)
+        for f in it:
+            yield f.replace('/', sep)
+    elif iter(pathname):
+        for p in pathname:
+            yield from iglobm(p, recursive=True, sep=os.sep)
     else:
-        it = glob.iglob(pattern, recursive=recursive)
-    return (f.replace('/', sep) for f in it)
+        raise TypeError
 
 
-def globm(pathname, recursive=True):
-    return list(iglobm(pathname, recursive=recursive))
+def globm(pathname, recursive=True, sep=os.sep):
+    return list(iglobm(pathname, recursive=recursive, sep=os.sep))
 
 
 def rmempty(path, rm=False):
@@ -148,6 +156,17 @@ def stopwatch(name='anonymous'):
 
 def strnow(format='%Y/%m/%d %H:%M:%S'):
     return datetime.now().strftime(format)
+
+
+class StrNow(object):
+    ''' 呼び出し時の時刻を文字列で返す'''
+    def __init__(self, format='%Y%m%d_%H%M%S'):
+        self.format = format
+
+    def __str__(self):
+        return datetime.now().strftime(self.format)
+
+snow = StrNow()
 
 
 ################################################################################
@@ -276,3 +295,13 @@ class CDLLHandle(object):
             return pyf
         finally:
             pass
+
+
+################################################################################
+
+if __name__ == '__main__':
+    from time import sleep
+    for i in range(3):
+        print(snow)
+        sleep(1)
+        snow.format = snow.format[:-2]
