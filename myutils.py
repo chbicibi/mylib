@@ -60,19 +60,26 @@ def popen(*cmds):
 
 
 def iglobm(pathname, recursive=True, sep=os.sep):
-    keys = list(product(*(s.split(',')
-                          for s in re.findall(r'{(.+?)}', pathname))))
-    pattern = re.sub(r'(?<={).+?(?=})', '', pathname)
-    if keys:
-        it = chain(*(glob.iglob(pattern.format(*k), recursive=recursive)
-                     for k in keys))
+    if isinstance(pathname, str):
+        keys = list(product(*(s.split(',')
+                              for s in re.findall(r'{(.+?)}', pathname))))
+        pattern = re.sub(r'(?<={).+?(?=})', '', pathname)
+        if keys:
+            it = chain(*(glob.iglob(pattern.format(*k), recursive=recursive)
+                         for k in keys))
+        else:
+            it = glob.iglob(pattern, recursive=recursive)
+        for f in it:
+            yield f.replace('/', sep)
+    elif iter(pathname):
+        for p in pathname:
+            yield from iglobm(p, recursive=True, sep=os.sep)
     else:
-        it = glob.iglob(pattern, recursive=recursive)
-    return (f.replace('/', sep) for f in it)
+        raise TypeError
 
 
-def globm(pathname, recursive=True):
-    return list(iglobm(pathname, recursive=recursive))
+def globm(pathname, recursive=True, sep=os.sep):
+    return list(iglobm(pathname, recursive=recursive, sep=os.sep))
 
 
 def rmempty(path, rm=False):
