@@ -215,6 +215,7 @@ def fsort(l):
 ################################################################################
 
 def save(file, item, to_json=False):
+    os.makedirs(os.path.dirname(file), exist_ok=True)
     if to_json:
         with open(file, 'w', encoding='utf-8') as f:
             json.dump(item, f, ensure_ascii=False, indent=2)
