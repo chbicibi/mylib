@@ -1,16 +1,3 @@
-#! /usr/bin/env python3
-
-'''
-2018.8.16 ver 0.1
-2018.8.18 ver 0.2
-2018.8.23 ver 0.3
-2018.8.26 ver 0.4
-2018.9.02 ver 0.5
-2018.9.13 ver 0.6
-2018.9.16 ver 0.7 v0.1
-2018.12.11 ver 0.8
-'''
-
 import ctypes
 import glob
 import hashlib
@@ -19,6 +6,7 @@ import os
 import pickle
 import re
 import subprocess
+import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -26,6 +14,15 @@ from contextlib import contextmanager
 from datetime import datetime
 from functools import wraps
 from itertools import chain, product
+
+
+################################################################################
+# constants
+################################################################################
+
+KB1 = 1024
+MB1 = 1048576
+GB1 = 1073741824
 
 
 ################################################################################
@@ -110,9 +107,53 @@ def realpath(path):
     return os.path.join(realpath(dirname), basename)
 
 
+def filesize(path='.', follow_symlinks=False):
+    if isinstance(path, os.DirEntry):
+        return filesize(path.path, follow_symlinks=follow_symlinks)
+
+    if not follow_symlinks and os.path.islink(path):
+        return 0
+
+    if os.path.isfile(path):
+        return os.path.getsize(path)
+
+    # if not os.path.isdir(path):
+    #     raise FileNotFoundError
+
+    total = 0
+    with os.scandir(path) as it:
+        for entry in it:
+            if entry.is_file(follow_symlinks=follow_symlinks):
+                total += entry.stat().st_size
+            elif entry.is_dir(follow_symlinks=follow_symlinks):
+                total += filesize(entry.path, follow_symlinks=follow_symlinks)
+    return total
+
+
 ################################################################################
 # stopwatch
 ################################################################################
+
+class Stopwatch(object):
+    def __init__(self, name='anonymous'):
+        self.name = name
+        self.start = time.time()
+
+    def __call__(self):
+        return time.time() - self.start
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        elapsed = self()
+        isec = int(elapsed)
+        if isec < 60:
+            stime = f'{elapsed:.3g}秒'
+        else:
+            stime = f'{isec}秒 ({parse_time(isec)})'
+        print(f'[Stopwatch@{strnow()}] {self.name}: {stime}')
+
 
 def parse_time(a):
     if 0 < a < 1:
@@ -141,17 +182,8 @@ def stopwatch_old(func):
     return wrapper
 
 
-@contextmanager
 def stopwatch(name='anonymous'):
-    start = time.time()
-    yield lambda: time.time() - start
-    elapsed_time = time.time() - start
-    isec = int(elapsed_time)
-    if isec < 60:
-        stime = f'{elapsed_time:.3g}秒'
-    else:
-        stime = f'{isec}秒 ({parse_time(isec)})'
-    print(f'[Stopwatch@{strnow()}] {name}: {stime}')
+    return Stopwatch(name)
 
 
 def strnow(format='%Y/%m/%d %H:%M:%S'):
@@ -208,6 +240,41 @@ def fsort(l):
     key = lambda s: [a or int(b)
                      for a, b in re.compile(r'(\D+)|(\d+)').findall('_' + s)]
     return sorted(l, key=key)
+
+
+def select_file(path='.', key=None):
+    def key_f(file):
+        if key is None:
+            return True
+        elif callable(key):
+            return key(file)
+        elif isinstance(key, str):
+            return re.match(key, file)
+        else:
+            return key.match(file)
+
+    def exit_():
+        print('exit')
+        sys.exit(0)
+
+    files = fsort((x for x in os.listdir(path) if key_f(x)))
+
+    if not files:
+        exit_()
+
+    for i, file in enumerate(files):
+        size = filesize(os.path.join(path, file))
+        print(f'[{i}]', file, f'({size//KB1}KB)')
+    print(f'[{len(files)}] Exit')
+    print('select file:')
+
+    try:
+        n = int(input())
+        file = files[n]
+        return os.path.join(path, file)
+
+    except (ValueError, IndexError):
+        exit_()
 
 
 ################################################################################
@@ -282,7 +349,8 @@ class CDLLHandle(object):
         # should be unloaded dll handle
         pass
 
-    def get_fortran_function(self, name, argtypes, restype='void', callback=lambda *x: x):
+    def get_fortran_function(self, name, argtypes, restype='void',
+                             callback=lambda *x: x):
         try:
             f_ = getattr(self.cdll, name)
             f_.argtypes = [ctypes.POINTER(C_TYPES[t]) for t in argtypes]
