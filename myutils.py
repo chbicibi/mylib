@@ -5,6 +5,7 @@ import json
 import os
 import pickle
 import re
+import smtplib
 import subprocess
 import sys
 import threading
@@ -12,8 +13,12 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import datetime
+from email.message import EmailMessage
 from functools import wraps
 from itertools import chain, product
+
+
+SRC_DIR = os.path.dirname(__file__)
 
 
 ################################################################################
@@ -154,6 +159,9 @@ class Stopwatch(object):
             stime = f'{isec}秒 ({parse_time(isec)})'
         print(f'[Stopwatch@{strnow()}] {self.name}: {stime}')
 
+    def __str__(self):
+        return time2str(self())
+
 
 def parse_time(a):
     if 0 < a < 1:
@@ -164,6 +172,22 @@ def parse_time(a):
     m = f'{sec % 3600 // 60}分'      if sec >= 60    else ''
     s = f'{sec % 60}秒'
     return d + h + m + s
+
+
+def time2str(sec):
+    sign = '-' if sec < 0 else ''
+    abssec = abs(int(sec))
+    h = abssec // 3600
+    m = abssec % 3600 // 60
+    s = abssec % 60
+    def f_(res, x):
+        if res:
+            return  f'{res}:{x:02d}'
+        elif x:
+            return f'{x:02d}'
+        else:
+            return ''
+    return sign + reduce(f_, [h, m, s], '')
 
 
 def stopwatch_old(func):
@@ -262,11 +286,15 @@ def select_file(path='.', key=None):
     if not files:
         exit_()
 
+    print('### SELECT FILE ###')
     for i, file in enumerate(files):
         size = filesize(os.path.join(path, file))
-        print(f'[{i}]', file, f'({size//KB1}KB)')
+        if size < 10 * MB1:
+            print(f'[{i}]', file, f'({size//KB1}KB)')
+        else:
+            print(f'[{i}]', file, f'({size//MB1}MB)')
     print(f'[{len(files)}] Exit')
-    print('select file:')
+    print('input number:')
 
     try:
         n = int(input())
@@ -367,10 +395,79 @@ class CDLLHandle(object):
 
 
 ################################################################################
+# E-mail
+################################################################################
+
+class EmailIO(object):
+    def __init__(self, to=None, subject=''):
+        self.to = to
+        self.subject = subject
+        self.msgs = []
+        self.addr = None
+        self.pw = None
+        self.load_addr(os.path.join(SRC_DIR, '__local__', 'email.json'))
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if not self.addr:
+            return
+
+        if exc_type is None:
+            message = ''.join(self.msgs)
+            self.send_email(message)
+
+    def write(self, msg):
+        self.msgs.append(msg)
+
+    def print(self, *msgs):
+        self.msgs.append(' '.join(map(str, msgs)) + '\n')
+
+    def load_addr(self, file):
+        if not os.path.isfile(file):
+            print('EmailIO: user info file is not found')
+            return
+        info = load(file, from_json=True)
+        self.addr = info['addr']
+        self.pw = info['pw']
+
+    def send_email(self, message):
+        to_addr = self.to or self.addr
+        subject = ' '.join((x for x in (self.subject, '[MyPython]') if x))
+        send_email(self.addr, self.pw, to_addr, subject, message)
+
+
+def send_email(from_addr, pw, to_addr, subject, message):
+    msg = EmailMessage()
+    msg.set_content(message)
+
+    msg['Subject'] = subject + ' [MyPython]'
+    msg['From'] = from_addr
+    msg['To'] = to_addr
+
+    with smtplib.SMTP('smtp.gmail.com', 587) as s:
+        s.starttls()
+        s.login(from_addr, pw)
+        s.send_message(msg)
+
+
+################################################################################
+
+
+class TestIOClass(object):
+    def __init__(self):
+        self.a = []
+
+    def write(self, s):
+        print('io:', s)
+        self.a.append(s)
+
+
+def __test__():
+    io = TestIOClass()
+    print('test', file=io)
+    print(io.a)
 
 if __name__ == '__main__':
-    from time import sleep
-    for i in range(3):
-        print(snow)
-        sleep(1)
-        snow.format = snow.format[:-2]
+    __test__()
