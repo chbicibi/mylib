@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import datetime
 from email.message import EmailMessage
-from functools import wraps
+from functools import reduce, wraps
 from itertools import chain, product
 
 
@@ -37,8 +37,9 @@ GB1 = 1073741824
 @contextmanager
 def chdir(path):
     prev_path = os.getcwd()
-    os.makedirs(path, exist_ok=True)
-    os.chdir(path)
+    if path:
+        os.makedirs(path, exist_ok=True)
+        os.chdir(path)
     try:
         yield
     finally:
@@ -152,26 +153,20 @@ class Stopwatch(object):
 
     def __exit__(self, exc_type, exc_value, traceback):
         elapsed = self()
-        isec = int(elapsed)
-        if isec < 60:
+        if elapsed < 60:
             stime = f'{elapsed:.3g}秒'
         else:
-            stime = f'{isec}秒 ({parse_time(isec)})'
+            stime = f'{elapsed:.0f}秒 ({parse_time(int(elapsed))})'
         print(f'[Stopwatch@{strnow()}] {self.name}: {stime}')
+
+    def __float__(self):
+        return self()
+
+    def __int__(self):
+        return int(self())
 
     def __str__(self):
         return time2str(self())
-
-
-def parse_time(a):
-    if 0 < a < 1:
-        return f'{a:.3g}秒'
-    sec = int(a)
-    d = f'{sec // 86400}日'          if sec >= 86400 else ''
-    h = f'{sec % 86400 // 3600}時間' if sec >= 3600  else ''
-    m = f'{sec % 3600 // 60}分'      if sec >= 60    else ''
-    s = f'{sec % 60}秒'
-    return d + h + m + s
 
 
 def time2str(sec):
@@ -188,6 +183,17 @@ def time2str(sec):
         else:
             return ''
     return sign + reduce(f_, [h, m, s], '')
+
+
+def parse_time(a):
+    if 0 < a < 1:
+        return f'{a:.3g}秒'
+    sec = int(a)
+    d = f'{sec // 86400}日'          if sec >= 86400 else ''
+    h = f'{sec % 86400 // 3600}時間' if sec >= 3600  else ''
+    m = f'{sec % 3600 // 60}分'      if sec >= 60    else ''
+    s = f'{sec % 60}秒'
+    return d + h + m + s
 
 
 def stopwatch_old(func):
@@ -281,7 +287,7 @@ def select_file(path='.', key=None):
         print('exit')
         sys.exit(0)
 
-    files = fsort((x for x in os.listdir(path) if key_f(x)))
+    files = fsort(filter(key_f, os.listdir(path)))
 
     if not files:
         exit_()
@@ -434,7 +440,7 @@ class EmailIO(object):
 
     def send_email(self, message):
         to_addr = self.to or self.addr
-        subject = ' '.join((x for x in (self.subject, '[MyPython]') if x))
+        subject = ' '.join(filter(None, (self.subject, '[MyPython]')))
         send_email(self.addr, self.pw, to_addr, subject, message)
 
 
@@ -442,7 +448,7 @@ def send_email(from_addr, pw, to_addr, subject, message):
     msg = EmailMessage()
     msg.set_content(message)
 
-    msg['Subject'] = subject + ' [MyPython]'
+    msg['Subject'] = subject
     msg['From'] = from_addr
     msg['To'] = to_addr
 
