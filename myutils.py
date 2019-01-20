@@ -38,7 +38,7 @@ GB1 = 1073741824
 def chdir(path):
     prev_path = os.getcwd()
     if path:
-        os.makedirs(path, exist_ok=True)
+        mkdir(path)
         os.chdir(path)
     try:
         yield
@@ -97,7 +97,8 @@ def rmempty(path, rm=False):
 
 
 def mkdir(path):
-    os.makedirs(path, exist_ok=True)
+    if path:
+        os.makedirs(path, exist_ok=True)
 
 
 def realpath(path):
@@ -316,7 +317,7 @@ def select_file(path='.', key=None):
 ################################################################################
 
 def save(file, item, to_json=False):
-    os.makedirs(os.path.dirname(file), exist_ok=True)
+    mkdir(os.path.dirname(file))
     if to_json:
         with open(file, 'w', encoding='utf-8') as f:
             json.dump(item, f, ensure_ascii=False, indent=2)
