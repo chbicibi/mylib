@@ -155,10 +155,13 @@ class Stopwatch(object):
     def __exit__(self, exc_type, exc_value, traceback):
         elapsed = self()
         if elapsed < 60:
+            return
             stime = f'{elapsed:.3g}秒'
         else:
             stime = f'{elapsed:.0f}秒 ({parse_time(int(elapsed))})'
         print(f'[Stopwatch@{strnow()}] {self.name}: {stime}')
+        if exc_type:
+            print('Exception:', exc_type)
 
     def __float__(self):
         return self()
@@ -168,6 +171,12 @@ class Stopwatch(object):
 
     def __str__(self):
         return time2str(self())
+
+    def __lt__(self, other):
+        return float(self) < other
+
+    def __gt__(self, other):
+        return float(self) > other
 
 
 def time2str(sec):
@@ -288,7 +297,7 @@ def select_file(path='.', key=None):
         print('exit')
         sys.exit(0)
 
-    files = fsort(filter(key_f, os.listdir(path)))
+    files = fsort(filter(key_f, os.listdir(path)))[-20:]
 
     if not files:
         exit_()
