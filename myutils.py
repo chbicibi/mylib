@@ -160,8 +160,9 @@ class Stopwatch(object):
         else:
             stime = f'{elapsed:.0f}秒 ({parse_time(int(elapsed))})'
         print(f'[Stopwatch@{strnow()}] {self.name}: {stime}')
-        if exc_type:
-            print('Exception:', exc_type)
+        if exc_type is not None:
+            print('Exception:', exc_type, exc_value)
+            print('---')
 
     def __float__(self):
         return self()
@@ -282,7 +283,7 @@ def fsort(l):
     return sorted(l, key=key)
 
 
-def select_file(path='.', key=None):
+def select_file(path='.', key=None, files=None, nselect=None, idx=None):
     def key_f(file):
         if key is None:
             return True
@@ -297,7 +298,14 @@ def select_file(path='.', key=None):
         print('exit')
         sys.exit(0)
 
-    files = fsort(filter(key_f, os.listdir(path)))[-20:]
+    if not nselect:
+        nselect = 0
+
+    if files is None:
+        files = filter(key_f, os.listdir(path))
+    else:
+        path = ''
+    files = fsort(files)[-nselect:]
 
     if not files:
         exit_()
@@ -313,7 +321,10 @@ def select_file(path='.', key=None):
     print('input number:')
 
     try:
-        n = int(input())
+        if idx is not None:
+            n = idx
+        else:
+            n = int(input())
         file = files[n]
         return os.path.join(path, file)
 
