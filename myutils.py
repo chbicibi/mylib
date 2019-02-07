@@ -332,6 +332,52 @@ def select_file(path='.', key=None, files=None, nselect=None, idx=None):
         exit_()
 
 
+def remove_empty_dirs(path='.', depth=0, ignore_error=False):
+    ''' 空/削除済み=>True, それ以外=>False
+    '''
+
+    if not os.path.exists(path):
+        if os.path.islink(path) or os.path.isfile(path) or os.path.isdir(path):
+            print('RM(l):', path)
+            try:
+                os.remove(path)
+            except PermissionError as e:
+                print(e)
+                if ignore_error:
+                    return False
+                else:
+                    raise
+        else:
+            raise FileNotFoundError
+        return True
+
+    if os.path.isfile(path):
+        return False
+
+    if os.path.isdir(path):
+        if os.path.islink(path):
+            is_empty = remove_empty_dirs(os.readlink(path), depth=depth)
+        else:
+            print('--' * depth, path)
+            is_empty = True
+            try:
+                with chdir(path):
+                    for file in os.listdir('.'):
+                        is_empty &= remove_empty_dirs(file, depth=depth+1)
+            except PermissionError as e:
+                print(e)
+                if ignore_error:
+                    return False
+                else:
+                    raise
+        if is_empty:
+            print('RM(d):', path)
+            os.rmdir(path)
+        return is_empty
+
+    raise Exception('Unexpected Error')
+
+
 ################################################################################
 # pickle
 ################################################################################
