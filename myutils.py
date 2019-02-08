@@ -36,6 +36,11 @@ GB1 = 1073741824
 
 @contextmanager
 def chdir(path):
+    ''' カレントディレクトリを変更する
+    with chdir(dirname):
+        ...
+    '''
+
     prev_path = os.getcwd()
     if path:
         mkdir(path)
@@ -47,10 +52,16 @@ def chdir(path):
 
 
 def open_loc(file):
+    ''' ファイルが選択された状態でエクスプローラを開く
+    '''
+
     subprocess.run(['explorer', '/select,', file.replace('/', '\\')])
 
 
 def popen(*cmds):
+    ''' 外部コマンドを実行し標準出力をイテレータで返す
+    '''
+
     proc = subprocess.Popen(cmds,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT)
@@ -63,6 +74,9 @@ def popen(*cmds):
 
 
 def iglobm(pathname, recursive=True, sep=os.sep):
+    ''' 条件に一致するファイル一覧をイテレータで返す
+    '''
+
     if isinstance(pathname, str):
         keys = list(product(*(s.split(',')
                               for s in re.findall(r'{(.+?)}', pathname))))
@@ -82,13 +96,17 @@ def iglobm(pathname, recursive=True, sep=os.sep):
 
 
 def globm(pathname, recursive=True, sep=os.sep):
+    ''' 条件に一致するファイル一覧を配列で返す
+    '''
+
     return list(iglobm(pathname, recursive=recursive, sep=os.sep))
 
 
 def rmempty(path, rm=False):
+    raise
     if not os.path.isdir(path):
         return True
-    L = [x for x in (rmempty(os.path.join(path, f), rm=True)
+    L = [x for x in (rmempty(os.path.join(path, f), rm=rm)
                      for f in os.listdir(path)) if x]
     if not L and rm:
         print('Removing:', path)
@@ -97,11 +115,17 @@ def rmempty(path, rm=False):
 
 
 def mkdir(path):
+    ''' 深い階層のディレクトリを作成する
+    '''
+
     if path:
         os.makedirs(path, exist_ok=True)
 
 
 def realpath(path):
+    ''' ファイルの実体のパスを返す
+    '''
+
     abspath = os.path.abspath(path)
     if not os.path.exists(abspath):
         raise FileNotFoundError
@@ -115,6 +139,9 @@ def realpath(path):
 
 
 def filesize(path='.', follow_symlinks=False):
+    ''' ファイル又はディレクトリの大きさを返す
+    '''
+
     if isinstance(path, os.DirEntry):
         return filesize(path.path, follow_symlinks=follow_symlinks)
 
