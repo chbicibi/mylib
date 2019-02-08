@@ -31,6 +31,105 @@ GB1 = 1073741824
 
 
 ################################################################################
+# path
+################################################################################
+
+def repair_path(path):
+    ''' ファイルパスの不正文字を置換
+    '''
+
+    table = str.maketrans('\\/:*?"<>|', '￥／：＊？”＜＞｜', '')
+    return path.translate(table)
+
+
+def uniq_path(path, ftype='file', key=r'_(\d{1,3})$', suf=lambda n: f'_{n}'):
+    ''' 同名のファイルが存在した場合にプレフィックスを追加する
+    '''
+
+    if not ftype in ['file', 'dir']:
+        raise Exception(f'ftype が不正です: {ftype}')
+    if not re.match(key, suf(0)):
+        raise Exception('suf が key にマッチしません')
+    exist_f = os.path.isfile if ftype == 'file' else os.path.isdir
+    split_f = os.path.splitext if ftype == 'file' else lambda path: (path, '')
+    if exist_f(path):
+        root, ext = split_f(path)
+        m = re.search(key, root)
+        n = int(m.groups()[0]) if m else 0
+        return uniq_path(re.sub(key, '', root) + suf(n + 1) + ext,
+                         ftype=ftype, key=key, suf=suf)
+    return path
+
+
+def md5(s):
+    ''' md5値を返す
+    '''
+
+    return hashlib.md5(s).hexdigest()
+
+
+def fsort(l):
+    ''' 数値を分離して考慮したソートを行う
+    '''
+
+    key = lambda s: [a or int(b)
+                     for a, b in re.compile(r'(\D+)|(\d+)').findall('_' + s)]
+    return sorted(l, key=key)
+
+
+def select_file(path='.', key=None, files=None, nselect=None, idx=None):
+    ''' 条件に合うファイル一覧を表示しユーザーに選択させる
+    '''
+
+    def key_f(file):
+        if key is None:
+            return True
+        elif callable(key):
+            return key(file)
+        elif isinstance(key, str):
+            return re.match(key, file)
+        else:
+            return key.match(file)
+
+    def exit_():
+        print('exit')
+        sys.exit(0)
+
+    if not nselect:
+        nselect = 0
+
+    if files is None:
+        files = filter(key_f, os.listdir(path))
+    else:
+        path = ''
+    files = fsort(files)[-nselect:]
+
+    if not files:
+        exit_()
+
+    print('### SELECT FILE ###')
+    for i, file in enumerate(files):
+        size = filesize(os.path.join(path, file))
+        if size < 10 * MB1:
+            print(f'[{i}]', file, f'({size//KB1}KB)')
+        else:
+            print(f'[{i}]', file, f'({size//MB1}MB)')
+    print(f'[{len(files)}] Exit')
+    print('input number:')
+
+    try:
+        if idx is not None:
+            n = idx
+        else:
+            n = int(input())
+        file = files[n]
+        return os.path.join(path, file)
+
+    except (ValueError, IndexError):
+        exit_()
+
+
+################################################################################
 # shell
 ################################################################################
 
@@ -164,6 +263,43 @@ def filesize(path='.', follow_symlinks=False):
     return total
 
 
+def remove_empty_dirs(path='.', depth=0):
+    ''' 空のディレクトリを再帰的に削除する
+    '''
+
+    if not os.path.exists(path):
+        if os.path.islink(path) or os.path.isfile(path) or os.path.isdir(path):
+            print('RM(l):', path)
+            os.remove(path)
+        else:
+            raise FileNotFoundError(os.path.abspath(path))
+        return 0
+
+    if os.path.isfile(path):
+        return 1
+
+    if os.path.isdir(path):
+        if os.path.islink(path):
+            n_files = remove_empty_dirs(os.readlink(path), depth=depth)
+
+        elif os.listdir(path) == 0:
+            n_files = 0
+
+        else:
+            print(f'{depth:<2}' + '--' * depth, path)
+            with chdir(path):
+                n_files = sum(remove_empty_dirs(file, depth=depth+1)
+                              for file in os.listdir('.'))
+
+        if n_files == 0:
+            print('RM(d):', path)
+            os.rmdir(path)
+
+        return n_files
+
+    raise Exception('Unexpected Error')
+
+
 ################################################################################
 # stopwatch
 ################################################################################
@@ -270,142 +406,6 @@ snow = StrNow()
 
 
 ################################################################################
-# path
-################################################################################
-
-def split3(path):
-    abspath = os.path.abspath
-    dirname, basename = os.path.split(abspath)
-    return (dirname, *os.path.splitext(basename))
-
-
-def repair_path(path):
-    table = str.maketrans('\\/:*?"<>|', '￥／：＊？”＜＞｜', '')
-    return path.translate(table)
-
-
-def uniq_path(path, ftype='file', key=r'_(\d{1,3})$', suf=lambda n: f'_{n}'):
-    if not ftype in ['file', 'dir']:
-        raise Exception(f'ftype が不正です: {ftype}')
-    if not re.match(key, suf(0)):
-        raise Exception('suf が key にマッチしません')
-    exist_f = os.path.isfile if ftype == 'file' else os.path.isdir
-    split_f = os.path.splitext if ftype == 'file' else lambda path: (path, '')
-    if exist_f(path):
-        root, ext = split_f(path)
-        m = re.search(key, root)
-        n = int(m.groups()[0]) if m else 0
-        return uniq_path(re.sub(key, '', root) + suf(n + 1) + ext,
-                         ftype=ftype, key=key, suf=suf)
-    return path
-
-
-def md5(s):
-    return hashlib.md5(s).hexdigest()
-
-
-def fsort(l):
-    key = lambda s: [a or int(b)
-                     for a, b in re.compile(r'(\D+)|(\d+)').findall('_' + s)]
-    return sorted(l, key=key)
-
-
-def select_file(path='.', key=None, files=None, nselect=None, idx=None):
-    def key_f(file):
-        if key is None:
-            return True
-        elif callable(key):
-            return key(file)
-        elif isinstance(key, str):
-            return re.match(key, file)
-        else:
-            return key.match(file)
-
-    def exit_():
-        print('exit')
-        sys.exit(0)
-
-    if not nselect:
-        nselect = 0
-
-    if files is None:
-        files = filter(key_f, os.listdir(path))
-    else:
-        path = ''
-    files = fsort(files)[-nselect:]
-
-    if not files:
-        exit_()
-
-    print('### SELECT FILE ###')
-    for i, file in enumerate(files):
-        size = filesize(os.path.join(path, file))
-        if size < 10 * MB1:
-            print(f'[{i}]', file, f'({size//KB1}KB)')
-        else:
-            print(f'[{i}]', file, f'({size//MB1}MB)')
-    print(f'[{len(files)}] Exit')
-    print('input number:')
-
-    try:
-        if idx is not None:
-            n = idx
-        else:
-            n = int(input())
-        file = files[n]
-        return os.path.join(path, file)
-
-    except (ValueError, IndexError):
-        exit_()
-
-
-def remove_empty_dirs(path='.', depth=0, ignore_error=False):
-    ''' 空/削除済み=>True, それ以外=>False
-    '''
-
-    if not os.path.exists(path):
-        if os.path.islink(path) or os.path.isfile(path) or os.path.isdir(path):
-            print('RM(l):', path)
-            try:
-                os.remove(path)
-            except PermissionError as e:
-                print(e)
-                if ignore_error:
-                    return False
-                else:
-                    raise
-        else:
-            raise FileNotFoundError
-        return True
-
-    if os.path.isfile(path):
-        return False
-
-    if os.path.isdir(path):
-        if os.path.islink(path):
-            is_empty = remove_empty_dirs(os.readlink(path), depth=depth)
-        else:
-            print('--' * depth, path)
-            is_empty = True
-            try:
-                with chdir(path):
-                    for file in os.listdir('.'):
-                        is_empty &= remove_empty_dirs(file, depth=depth+1)
-            except PermissionError as e:
-                print(e)
-                if ignore_error:
-                    return False
-                else:
-                    raise
-        if is_empty:
-            print('RM(d):', path)
-            os.rmdir(path)
-        return is_empty
-
-    raise Exception('Unexpected Error')
-
-
-################################################################################
 # pickle
 ################################################################################
 
@@ -434,7 +434,7 @@ def load(file, default=None, update=True, from_json=False):
 
 
 ################################################################################
-# multi thread
+# multi threading
 ################################################################################
 
 def run_mt(task, args_it, max_workers=1, Q=[]):
