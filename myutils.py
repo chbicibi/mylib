@@ -5,11 +5,13 @@ import json
 import os
 import pickle
 import re
+import shutil
 import smtplib
 import subprocess
 import sys
 import threading
 import time
+import unicodedata
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import datetime
@@ -59,6 +61,22 @@ def uniq_path(path, ftype='file', key=r'_(\d{1,3})$', suf=lambda n: f'_{n}'):
         return uniq_path(re.sub(key, '', root) + suf(n + 1) + ext,
                          ftype=ftype, key=key, suf=suf)
     return path
+
+
+def realpath(path):
+    ''' ファイルの実体のパスを返す
+    '''
+
+    abspath = os.path.abspath(path)
+    if not os.path.exists(abspath):
+        raise FileNotFoundError(abspath)
+    if os.path.islink(abspath):
+        return realpath(os.readlink(abspath))
+    dirname = os.path.dirname(abspath)
+    basename = os.path.basename(abspath)
+    if abspath == dirname:
+        return abspath
+    return os.path.join(realpath(dirname), basename)
 
 
 def md5(s):
@@ -201,16 +219,16 @@ def globm(pathname, recursive=True, sep=os.sep):
     return list(iglobm(pathname, recursive=recursive, sep=os.sep))
 
 
-def rmempty(path, rm=False):
-    raise
-    if not os.path.isdir(path):
-        return True
-    L = [x for x in (rmempty(os.path.join(path, f), rm=rm)
-                     for f in os.listdir(path)) if x]
-    if not L and rm:
-        print('Removing:', path)
-        os.rmdir(path)
-    return L
+# def rmempty(path, rm=False):
+#     raise
+#     if not os.path.isdir(path):
+#         return True
+#     L = [x for x in (rmempty(os.path.join(path, f), rm=rm)
+#                      for f in os.listdir(path)) if x]
+#     if not L and rm:
+#         print('Removing:', path)
+#         os.rmdir(path)
+#     return L
 
 
 def mkdir(path):
@@ -221,20 +239,17 @@ def mkdir(path):
         os.makedirs(path, exist_ok=True)
 
 
-def realpath(path):
-    ''' ファイルの実体のパスを返す
+def into_dir(src, dst):
+    ''' ファイルまたはディレクトリをディレクトリに移動する
     '''
 
-    abspath = os.path.abspath(path)
-    if not os.path.exists(abspath):
-        raise FileNotFoundError
-    if os.path.islink(abspath):
-        return realpath(os.readlink(abspath))
-    dirname = os.path.dirname(abspath)
-    basename = os.path.basename(abspath)
-    if abspath == dirname:
-        return abspath
-    return os.path.join(realpath(dirname), basename)
+    if os.path.isfile(dst):
+        raise OSError(f'{dst} is a file')
+    with chdir(dst):
+        file = os.path.basename(src)
+        if os.path.exists(file):
+            raise OSError(f'{file} already exists')
+    shutil.move(src, dst)
 
 
 def filesize(path='.', follow_symlinks=False):
@@ -305,6 +320,11 @@ def remove_empty_dirs(path='.', depth=0):
 ################################################################################
 
 class Stopwatch(object):
+    ''' 実行時間測定用クラス
+    with ut.Stopwatch(name):
+        ...
+    '''
+
     def __init__(self, name='anonymous'):
         self.name = name
         self.start = time.time()
@@ -344,6 +364,9 @@ class Stopwatch(object):
 
 
 def time2str(sec):
+    ''' timeオブジェクトを文字列に変換(コロン連結)
+    '''
+
     sign = '-' if sec < 0 else ''
     abssec = abs(int(sec))
     h = abssec // 3600
@@ -403,6 +426,28 @@ class StrNow(object):
         return datetime.now().strftime(self.format)
 
 snow = StrNow()
+
+
+################################################################################
+# string
+################################################################################
+
+def clip_str_it(s, l):
+    for c in s:
+        if unicodedata.east_asian_width(c) in 'FWA':
+            l -= 2
+        else:
+            l -= 1
+        if l < 0:
+            break
+        yield c
+
+
+def clip_str(string, limit):
+    ''' 全角文字を含む文字列を指定の長さ以下に切り詰めて返す
+    '''
+
+    return ''.join(clip_str_it(string, limit))
 
 
 ################################################################################
