@@ -163,7 +163,7 @@ def chdir(path):
         mkdir(path)
         os.chdir(path)
     try:
-        yield
+        yield os.getcwd()
     finally:
         os.chdir(prev_path)
 
@@ -448,6 +448,24 @@ def clip_str(string, limit):
     '''
 
     return ''.join(clip_str_it(string, limit))
+
+
+def wrap_str_it(string, limit):
+    l = limit
+    for c in string:
+        csize = 2 if unicodedata.east_asian_width(c) in 'FWA' else 1
+        if l < csize:
+            yield '\n'
+            l = limit
+        l -= csize
+        yield c
+
+
+def wrap_str(string, limit):
+    ''' 全角文字を含む文字列を指定の長さで折り返す
+    '''
+
+    return ''.join(wrap_str_it(string, limit))
 
 
 ################################################################################
