@@ -89,9 +89,17 @@ def md5(s):
 def fsort(l):
     ''' 数値を分離して考慮したソートを行う
     '''
+    pattern = re.compile(r'(\D+)|(\d+)')
 
-    key = lambda s: [a or int(b)
-                     for a, b in re.compile(r'(\D+)|(\d+)').findall('_' + s)]
+    def key(item):
+        if isinstance(item, str):
+            return [a or int(b) for a, b in pattern.findall('_' + item)]
+        elif hasattr(item, '__iter__') or hasattr(item, '__getitem__'):
+            return list(map(key, item))
+        else:
+            return item
+
+    # key = lambda s: [a or int(b) for a, b in pattern.findall('_' + s)]
     return sorted(l, key=key)
 
 
@@ -631,6 +639,7 @@ def __test__():
     io = TestIOClass()
     print('test', file=io)
     print(io.a)
+
 
 if __name__ == '__main__':
     __test__()
