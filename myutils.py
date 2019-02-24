@@ -337,32 +337,40 @@ class Stopwatch(object):
         self.name = name
         self.start = time.time()
 
-    def __call__(self):
-        return time.time() - self.start
+    def __call__(self, name=None):
+        # return time.time() - self.start
+        if name is not None:
+            self.name = name
+        return self
 
     def __enter__(self):
+        self.start = time.time()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        elapsed = self()
-        if elapsed < 60:
+        elapsed = float(self)
+        if elapsed < 10:
             return
+
+        elif elapsed < 60:
             stime = f'{elapsed:.3g}秒'
+
         else:
             stime = f'{elapsed:.0f}秒 ({parse_time(int(elapsed))})'
+
         print(f'[Stopwatch@{strnow()}] {self.name}: {stime}')
         if exc_type is not None:
             print('Exception:', exc_type, exc_value)
             print('---')
 
     def __float__(self):
-        return self()
+        return time.time() - self.start
 
     def __int__(self):
-        return int(self())
+        return int(float(self))
 
     def __str__(self):
-        return time2str(self())
+        return time2str(float(self))
 
     def __lt__(self, other):
         return float(self) < other
@@ -417,9 +425,10 @@ def stopwatch_old(func):
     return wrapper
 
 
-def stopwatch(name='anonymous'):
-    return Stopwatch(name)
+# def stopwatch(name='anonymous'):
+#     return Stopwatch(name)
 
+stopwatch = Stopwatch()
 
 def strnow(format='%Y/%m/%d %H:%M:%S'):
     return datetime.now().strftime(format)
