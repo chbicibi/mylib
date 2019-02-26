@@ -48,6 +48,13 @@ class Video(object):
                 raise IndexError
             return frame
 
+    def __iter__(self):
+        while True:
+            ret, frame = self.cap.read()
+            if not ret:
+                raise IndexError
+            yield frame
+
     def __next__(self):
         if self.cap is None:
             raise Exception('VideoCapture is closed')
@@ -134,3 +141,19 @@ class Video(object):
 
         else:
             return self.cap.get(cv2.CAP_PROP_POS_MSEC) / 1000
+
+    @property
+    def sec(self):
+        if self.cap is None:
+            return 0
+
+        else:
+            return round(self.time)
+
+    @property
+    def ms(self):
+        if self.cap is None:
+            return 0
+
+        else:
+            return int(self.cap.get(cv2.CAP_PROP_POS_MSEC)) % 1000

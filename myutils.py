@@ -86,21 +86,23 @@ def md5(s):
     return hashlib.md5(s).hexdigest()
 
 
-def fsort(l):
+def fsort(l, key=None):
     ''' 数値を分離して考慮したソートを行う
     '''
     pattern = re.compile(r'(\D+)|(\d+)')
 
-    def key(item):
+    def f_key(item):
+        if key:
+            item = key(item)
         if isinstance(item, str):
             return [a or int(b) for a, b in pattern.findall('_' + item)]
         elif hasattr(item, '__iter__') or hasattr(item, '__getitem__'):
-            return list(map(key, item))
+            return list(map(f_key, item))
         else:
             return item
 
     # key = lambda s: [a or int(b) for a, b in pattern.findall('_' + s)]
-    return sorted(l, key=key)
+    return sorted(l, key=f_key)
 
 
 def select_file(path='.', key=None, files=None, nselect=None, idx=None):
@@ -239,15 +241,18 @@ def globm(pathname, recursive=True, sep=os.sep):
 #     return L
 
 
-def mkdir(path):
+def makedirs(path):
     ''' 深い階層のディレクトリを作成する
     '''
-
     if path:
         os.makedirs(path, exist_ok=True)
 
 
-def into_dir(src, dst):
+def mkdir(*args, **kwargs):
+    return makedirs(*args, **kwargs)
+
+
+def into_dir(src, dst, force=False):
     ''' ファイルまたはディレクトリをディレクトリに移動する
     '''
 
@@ -256,7 +261,10 @@ def into_dir(src, dst):
     with chdir(dst):
         file = os.path.basename(src)
         if os.path.exists(file):
-            raise OSError(f'{file} already exists')
+            if force:
+                os.remove(file)
+            else:
+                raise OSError(f'{file} already exists')
     shutil.move(src, dst)
 
 
@@ -333,15 +341,13 @@ class Stopwatch(object):
         ...
     '''
 
-    def __init__(self, name='anonymous'):
+    def __init__(self, name='anonymous', start=None):
         self.name = name
-        self.start = time.time()
+        self.start = start or time.time()
 
-    def __call__(self, name=None):
+    def __call__(self, name='anonymous'):
         # return time.time() - self.start
-        if name is not None:
-            self.name = name
-        return self
+        return Stopwatch(name, start=self.start)
 
     def __enter__(self):
         self.start = time.time()
@@ -379,7 +385,7 @@ class Stopwatch(object):
         return float(self) > other
 
 
-def time2str(sec):
+def time2str(sec, show_ms=False):
     ''' timeオブジェクトを文字列に変換(コロン連結)
     '''
 
@@ -395,7 +401,11 @@ def time2str(sec):
             return f'{x:02d}'
         else:
             return ''
-    return sign + reduce(f_, [h, m, s], '')
+    res = sign + reduce(f_, [h, m, s], '')
+    if show_ms:
+        return res + f'.{int(sec * 1000) % 1000 :03d}'
+    else:
+        return res
 
 
 def parse_time(a):
