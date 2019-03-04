@@ -13,6 +13,7 @@ import os
 # from itertools import chain
 # from time import sleep
 
+import numpy as np
 import cv2
 
 # import myutils as ut
@@ -73,6 +74,8 @@ class Video(object):
         if self.cap:
             self.cap.release()
             self.cap = None
+        if exc_type:
+            print(exc_type)
 
     def set(self, pos):
         if self.cap is None:
@@ -157,3 +160,36 @@ class Video(object):
 
         else:
             return int(self.cap.get(cv2.CAP_PROP_POS_MSEC)) % 1000
+
+
+################################################################################
+
+def imread(filename, flags=cv2.IMREAD_COLOR, dtype=np.uint8):
+    try:
+        n = np.fromfile(filename, dtype)
+        img = cv2.imdecode(n, flags)
+        return img
+    except Exception as e:
+        print(e)
+        return None
+
+
+def imwrite(filename, img, params=None):
+    try:
+        ext = os.path.splitext(filename)[1]
+        result, n = cv2.imencode(ext, img, params)
+
+        if result:
+            with open(filename, mode='w+b') as f:
+                n.tofile(f)
+            return True
+        else:
+            return False
+    except Exception as e:
+        print(e)
+        return False
+
+
+def imshow(img, wait=0, title='image'):
+    cv2.imshow(title, img)
+    cv2.waitKey(wait)

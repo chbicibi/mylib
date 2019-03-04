@@ -157,6 +157,15 @@ def select_file(path='.', key=None, files=None, nselect=None, idx=None):
         exit_()
 
 
+def basename(path, suffix=''):
+    fname = os.path.basename(path)
+    if suffix:
+        bname, ext = os.path.splitext(fname)
+        if suffix == ext or suffix == '.*':
+            return bname
+    return fname
+
+
 ################################################################################
 # shell
 ################################################################################
@@ -516,7 +525,7 @@ def load(file, default=None, update=True, from_json=False):
             save(file, data, to_json=from_json)
         return data
     if from_json:
-        with open(file, 'r', encoding='utf-8') as f:
+        with open(file, 'r', encoding='utf_8_sig') as f:
             return json.load(f)
     else:
         with open(file, 'rb') as f:
