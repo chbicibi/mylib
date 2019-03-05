@@ -166,6 +166,18 @@ def basename(path, suffix=''):
     return fname
 
 
+def getatime(path):
+    return datetime.fromtimestamp(os.path.getatime(path))
+
+
+def getmtime(path):
+    return datetime.fromtimestamp(os.path.getmtime(path))
+
+
+def getctime(path):
+    return datetime.fromtimestamp(os.path.getctime(path))
+
+
 ################################################################################
 # shell
 ################################################################################
