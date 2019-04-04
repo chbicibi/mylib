@@ -166,6 +166,10 @@ def basename(path, suffix=''):
     return fname
 
 
+def extname(path):
+    return os.path.splitext(path)[1]
+
+
 def getatime(path):
     return datetime.fromtimestamp(os.path.getatime(path))
 
@@ -183,11 +187,13 @@ def getctime(path):
 ################################################################################
 
 @contextmanager
-def chdir(path):
+def chdir(path, check_exists=False):
     ''' カレントディレクトリを変更する
     with chdir(dirname):
         ...
     '''
+    if check_exists and not os.path.isdir(path):
+        raise FileNotFoundError(path)
 
     prev_path = os.getcwd()
     if path:
@@ -221,7 +227,7 @@ def popen(*cmds):
             break
 
 
-def iglobm(pathname, recursive=True, sep=os.sep):
+def iglobm(pathname, recursive=True, sep=os.sep, abspath=False):
     ''' 条件に一致するファイル一覧をイテレータで返す
     '''
 
@@ -234,20 +240,26 @@ def iglobm(pathname, recursive=True, sep=os.sep):
                          for k in keys))
         else:
             it = glob.iglob(pattern, recursive=recursive)
+
+        if abspath:
+            it = map(os.path.abspath, it)
+
         for f in it:
             yield f.replace('/', sep)
+
     elif iter(pathname):
         for p in pathname:
-            yield from iglobm(p, recursive=True, sep=os.sep)
+            yield from iglobm(p, recursive=True, sep=os.sep, abspath=False)
+
     else:
         raise TypeError
 
 
-def globm(pathname, recursive=True, sep=os.sep):
+def globm(pathname, *args, **kwargs):
     ''' 条件に一致するファイル一覧を配列で返す
     '''
 
-    return list(iglobm(pathname, recursive=recursive, sep=os.sep))
+    return list(iglobm(pathname, *args, **kwargs))
 
 
 # def rmempty(path, rm=False):
@@ -314,38 +326,59 @@ def filesize(path='.', follow_symlinks=False):
                 total += filesize(entry.path, follow_symlinks=follow_symlinks)
     return total
 
+getsize = filesize
 
-def remove_empty_dirs(path='.', depth=0):
+
+def remove_empty_dirs(path='.', depth=0, ignore_errors=True):
     ''' 空のディレクトリを再帰的に削除する
     '''
+    def apply_(f, *args):
+        try:
+            # return
+            return f(*args)
+        except PermissionError:
+            if not ignore_errors:
+                raise
 
+    # 0: ファイル(存在なし)
     if not os.path.exists(path):
         if os.path.islink(path) or os.path.isfile(path) or os.path.isdir(path):
             print('RM(l):', path)
-            os.remove(path)
+            apply_(os.remove, path)
         else:
             raise FileNotFoundError(os.path.abspath(path))
         return 0
 
-    if os.path.isfile(path):
+    # 1: ファイル
+    elif os.path.isfile(path):
         return 1
 
-    if os.path.isdir(path):
-        if os.path.islink(path):
-            n_files = remove_empty_dirs(os.readlink(path), depth=depth)
+    # 2: ディレクトリ
+    elif os.path.isdir(path):
+        subfiles = os.listdir(path)
 
-        elif os.listdir(path) == 0:
+        if os.path.islink(path):
+            n_files = remove_empty_dirs(os.readlink(path), depth=depth,
+                                        ignore_errors=ignore_errors)
+
+        elif len(subfiles) == 0:
+            n_files = 0
+
+        elif subfiles == ['desktop.ini']:
+            os.remove(os.path.join(path, 'desktop.ini'))
             n_files = 0
 
         else:
             print(f'{depth:<2}' + '--' * depth, path)
             with chdir(path):
-                n_files = sum(remove_empty_dirs(file, depth=depth+1)
-                              for file in os.listdir('.'))
+                n_files = sum(remove_empty_dirs(file, depth=depth+1,
+                                                ignore_errors=ignore_errors)
+                              for file in subfiles)
 
         if n_files == 0:
             print('RM(d):', path)
-            os.rmdir(path)
+            apply_(os.rmdir, path)
+            # apply_(lambda f: subprocess.call(f'rmdir {f}', shell=True), path)
 
         return n_files
 
@@ -362,13 +395,14 @@ class Stopwatch(object):
         ...
     '''
 
-    def __init__(self, name='anonymous', start=None):
+    def __init__(self, name='anonymous', start=None, showtm=10):
         self.name = name
         self.start = start or time.time()
+        self.showtm = showtm
 
-    def __call__(self, name='anonymous'):
+    def __call__(self, *args, **kwargs):
         # return time.time() - self.start
-        return Stopwatch(name, start=self.start)
+        return Stopwatch(*args, start=self.start, **kwargs)
 
     def __enter__(self):
         self.start = time.time()
@@ -376,7 +410,7 @@ class Stopwatch(object):
 
     def __exit__(self, exc_type, exc_value, traceback):
         elapsed = float(self)
-        if elapsed < 10:
+        if elapsed < self.showtm:
             return
 
         elif elapsed < 60:
@@ -496,6 +530,8 @@ def clip_str(string, limit):
     '''
 
     return ''.join(clip_str_it(string, limit))
+
+clip = clip_str
 
 
 def wrap_str_it(string, limit):
@@ -665,6 +701,11 @@ def send_email(from_addr, pw, to_addr, subject, message):
 
 ################################################################################
 
+def getmethod(name, *args, **kwargs):
+    return lambda x: getattr(x, name)(*args, **kwargs)
+
+
+################################################################################
 
 class TestIOClass(object):
     def __init__(self):
