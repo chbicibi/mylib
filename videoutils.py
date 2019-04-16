@@ -12,6 +12,7 @@ import os
 # from functools import reduce
 # from itertools import chain
 # from time import sleep
+import traceback
 
 import numpy as np
 import cv2
@@ -411,6 +412,7 @@ def openvideo(path, *args, **kwargs):
 
 videohandle = openvideo
 
+
 ################################################################################
 
 def resize(img, size):
@@ -485,3 +487,8 @@ def yuv2bgr(y, u, v, t='yuv'):
         B = Y + 1.8556 * Cb
     r, g, b = (x.clip(0, 255).astype('u1') for x in (R, G, B))
     return b, g, r
+
+
+def grayscale(image):
+    assert image.ndim == 3
+    return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
