@@ -14,8 +14,11 @@ def get_args():
 
 def main():
     args = get_args()
-    for path in args.path:
-        ut.remove_empty_dirs(path, ignore_errors=False)
+    if not args.path:
+        ut.remove_empty_dirs('.', ignore_errors=False)
+    else:
+        for path in args.path:
+            ut.remove_empty_dirs(path, ignore_errors=False)
 
 
 if __name__ == '__main__':

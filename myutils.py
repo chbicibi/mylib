@@ -1,4 +1,5 @@
 import ctypes
+import errno
 import glob
 import hashlib
 import json
@@ -6,6 +7,7 @@ import os
 import pickle
 import re
 import shutil
+import signal
 import smtplib
 import subprocess
 import sys
@@ -18,7 +20,7 @@ from datetime import datetime
 from email.message import EmailMessage
 from functools import reduce, wraps
 from itertools import chain, product
-
+from myexec import ProcReader
 
 SRC_DIR = os.path.dirname(__file__)
 
@@ -30,6 +32,14 @@ SRC_DIR = os.path.dirname(__file__)
 KB1 = 1024
 MB1 = 1048576
 GB1 = 1073741824
+
+
+################################################################################
+# collections
+################################################################################
+
+def uniq_list(seq):
+    type(seq)(dict.fromkeys(seq))
 
 
 ################################################################################
@@ -86,7 +96,7 @@ def md5(s):
     return hashlib.md5(s).hexdigest()
 
 
-def fsort(l, key=None):
+def fsort(l, key=None, reverse=False):
     ''' 数値を分離して考慮したソートを行う
     '''
     pattern = re.compile(r'(\D+)|(\d+)')
@@ -102,7 +112,7 @@ def fsort(l, key=None):
             return item
 
     # key = lambda s: [a or int(b) for a, b in pattern.findall('_' + s)]
-    return sorted(l, key=f_key)
+    return sorted(l, key=f_key, reverse=reverse)
 
 
 def select_file(path='.', key=None, files=None, nselect=None, idx=None):
@@ -556,25 +566,35 @@ def wrap_str(string, limit):
 # pickle
 ################################################################################
 
-def save(file, item, to_json=False):
+def save(file, item, to_json=None):
+    if to_json is None and file.endswith('.json'):
+        to_json = True
+
     mkdir(os.path.dirname(file))
+
     if to_json:
         with open(file, 'w', encoding='utf-8') as f:
             json.dump(item, f, ensure_ascii=False, indent=2)
+
     else:
         with open(file, 'wb') as f:
             pickle.dump(item, f)
 
 
-def load(file, default=None, update=True, from_json=False):
+def load(file, default=None, update=True, from_json=None):
+    if from_json is None and file.endswith('.json'):
+        from_json = True
+
     if not os.path.isfile(file):
         data = default
         if data and update:
             save(file, data, to_json=from_json)
         return data
+
     if from_json:
         with open(file, 'r', encoding='utf_8_sig') as f:
             return json.load(f)
+
     else:
         with open(file, 'rb') as f:
             return pickle.load(f)
@@ -714,6 +734,33 @@ class TestIOClass(object):
     def write(self, s):
         print('io:', s)
         self.a.append(s)
+
+
+################################################################################
+
+class TimeoutError(Exception):
+    pass
+
+def timeout(seconds=10, error_message=os.strerror(errno.ETIME)):
+    def decorator(func):
+        def _handle_timeout(signum, frame):
+            raise TimeoutError(error_message)
+
+        def wrapper(*args, **kwargs):
+            signal.signal(signal.SIGALRM, _handle_timeout)
+            signal.alarm(seconds)
+            try:
+                result = func(*args, **kwargs)
+            finally:
+                signal.alarm(0)
+            return result
+
+        return wraps(func)(wrapper)
+
+    return decorator
+
+
+################################################################################
 
 
 def __test__():
