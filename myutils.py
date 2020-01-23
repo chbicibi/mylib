@@ -339,7 +339,7 @@ def filesize(path='.', follow_symlinks=False):
 getsize = filesize
 
 
-def remove_empty_dirs(path='.', depth=0, ignore_errors=True):
+def remove_empty_dirs(path='.', depth=0, ignore_errors=True, info=''):
     ''' 空のディレクトリを再帰的に削除する
     '''
     def apply_(f, *args):
@@ -353,7 +353,7 @@ def remove_empty_dirs(path='.', depth=0, ignore_errors=True):
     # 0: ファイル(存在なし)
     if not os.path.exists(path):
         if os.path.islink(path) or os.path.isfile(path) or os.path.isdir(path):
-            print('RM(l):', path)
+            print(f'D {depth:<2}' + '--' * depth, path, info, '(link)')
             apply_(os.remove, path)
         else:
             raise FileNotFoundError(os.path.abspath(path))
@@ -365,30 +365,35 @@ def remove_empty_dirs(path='.', depth=0, ignore_errors=True):
 
     # 2: ディレクトリ
     elif os.path.isdir(path):
-        subfiles = os.listdir(path)
-
         if os.path.islink(path):
             n_files = remove_empty_dirs(os.readlink(path), depth=depth,
                                         ignore_errors=ignore_errors)
 
-        elif len(subfiles) == 0:
-            n_files = 0
-
-        elif subfiles == ['desktop.ini']:
-            os.remove(os.path.join(path, 'desktop.ini'))
-            n_files = 0
-
         else:
-            print(f'{depth:<2}' + '--' * depth, path)
-            with chdir(path):
-                n_files = sum(remove_empty_dirs(file, depth=depth+1,
-                                                ignore_errors=ignore_errors)
-                              for file in subfiles)
+            subfiles = fsort(os.listdir(path))
+            s = len(subfiles)
+
+            if s == 0:
+                n_files = 0
+
+            elif subfiles == ['desktop.ini']:
+                os.remove(os.path.join(path, 'desktop.ini'))
+                n_files = 0
+
+            else:
+                with chdir(path):
+                    n_files = sum(remove_empty_dirs(file, depth=depth+1,
+                                                    ignore_errors=ignore_errors,
+                                                    info=f'({i+1}/{s})')
+                                  for i, file in enumerate(subfiles))
 
         if n_files == 0:
-            print('RM(d):', path)
+            tag = 'D'
             apply_(os.rmdir, path)
+        else:
+            tag = ' '
             # apply_(lambda f: subprocess.call(f'rmdir {f}', shell=True), path)
+        print(tag, f'{depth:<2}' + '--' * depth, path, info, n_files)
 
         return n_files
 
@@ -448,6 +453,9 @@ class Stopwatch(object):
 
     def __gt__(self, other):
         return float(self) > other
+
+    def __bool__(self):
+        return self > 0
 
 
 def time2str(sec, show_ms=False):
@@ -598,6 +606,15 @@ def load(file, default=None, update=True, from_json=None):
     else:
         with open(file, 'rb') as f:
             return pickle.load(f)
+
+
+@contextmanager
+def edit(file, *args, **kwargs):
+    print('[load]', file)
+    data = load(file, *args, **kwargs)
+    yield data
+    print('[save]', file)
+    save(file, data)
 
 
 ################################################################################

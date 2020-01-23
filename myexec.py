@@ -22,8 +22,10 @@ class ProcReader(object):
         return self
 
     def __exit__(self, ty, val, tr):
-        if self.proc.poll() is not None:
+        if self.proc.poll() is None:
             self.proc.terminate()
+            # subprocess.run(['taskkill', '/pid', f'{self.proc.pid}'])
+            time.sleep(3)
 
     def __iter__(self):
         limit = self.timeout
