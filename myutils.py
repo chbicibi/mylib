@@ -20,7 +20,6 @@ from datetime import datetime
 from email.message import EmailMessage
 from functools import reduce, wraps
 from itertools import chain, product
-from myexec import ProcReader
 
 SRC_DIR = os.path.dirname(__file__)
 
